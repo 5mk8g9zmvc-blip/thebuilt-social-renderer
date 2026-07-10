@@ -114,9 +114,10 @@ jobs:
             --form "voiceover_count=5"
           )
           if [ "$status" = success ]; then
+            base64 --wrap=0 "output/${OUTPUT_NAME}.mp4" > "output/${OUTPUT_NAME}.mp4.b64"
             callback+=(
-              --form "data=@output/${OUTPUT_NAME}.mp4;type=video/mp4"
-              --form "validation_report=@output/${OUTPUT_NAME}.report.json;type=application/json"
+              --form "mp4_base64=<output/${OUTPUT_NAME}.mp4.b64"
+              --form "validation_report=<output/${OUTPUT_NAME}.report.json"
             )
           fi
           curl "${callback[@]}" "$RESUME_URL"
