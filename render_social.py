@@ -133,7 +133,7 @@ def render_scene(
     )
     audio_filter = (
         "loudnorm=I=-16:LRA=11:TP=-1.5,"
-        f"apad=pad_dur={duration:.3f},atrim=0:{duration:.3f},"
+        f"apad,atrim=0:{duration:.3f},"
         "afade=t=in:st=0:d=0.08,"
         f"afade=t=out:st={max(0.0, duration - 0.18):.3f}:d=0.18"
     )
@@ -358,45 +358,3 @@ def main() -> int:
     final_duration = duration_seconds(final_info)
     errors: list[str] = []
     if len(video_streams) != 1:
-        errors.append("expected_one_video_stream")
-    if len(audio_streams) != 1:
-        errors.append("expected_one_audio_stream")
-    if video_streams and (video_streams[0].get("width"), video_streams[0].get("height")) != (1080, 1920):
-        errors.append("invalid_dimensions")
-    if not 10 <= final_duration <= 60:
-        errors.append("duration_outside_10_to_60_seconds")
-    if output.stat().st_size < 500_000:
-        errors.append("output_file_suspiciously_small")
-
-    report = {
-        "passed": not errors,
-        "errors": errors,
-        "brand": brand,
-        "scene_count": len(scenes),
-        "image_count": len(scenes),
-        "voiceover_count": len(scenes),
-        "voice_provider": "ElevenLabs",
-        "source_voiceover_format": "ElevenLabs output (MP3 accepted)",
-        "delivery_audio_codec": "AAC inside the social MP4 container",
-        "cta_scene": 5,
-        "width": video_streams[0].get("width") if video_streams else None,
-        "height": video_streams[0].get("height") if video_streams else None,
-        "duration": round(final_duration, 3),
-        "bytes": output.stat().st_size,
-        "video_codec": video_streams[0].get("codec_name") if video_streams else None,
-        "audio_codec": audio_streams[0].get("codec_name") if audio_streams else None,
-        "scenes": scene_report,
-    }
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(json.dumps(report, indent=2))
-    if errors:
-        raise RuntimeError("Final render failed validation: " + ", ".join(errors))
-    return 0
-
-
-if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except Exception as error:
-        print(f"RENDER_FAILED: {error}", file=sys.stderr)
-        raise
