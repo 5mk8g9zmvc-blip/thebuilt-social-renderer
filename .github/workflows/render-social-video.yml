@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload validated render
         id: upload
-        if: ${{ steps.render.outcome == 'success' }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.output_name || 'smoke-test' }}
