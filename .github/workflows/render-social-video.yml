@@ -1,0 +1,65 @@
+name: Render five-scene social video
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - render_social.py
+      - example-manifest.json
+      - .github/workflows/render-social-video.yml
+  workflow_dispatch:
+    inputs:
+      manifest_url:
+        description: Public HTTPS URL for the five-scene manifest
+        required: false
+        type: string
+      output_name:
+        description: Output filename without extension
+        required: true
+        default: social-video
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out renderer
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg fonts-dejavu-core
+
+      - name: Prepare push smoke-test assets
+        if: ${{ inputs.manifest_url == '' }}
+        run: |
+          mkdir -p assets
+          colours=(243447 3A506B 2F4858 463F3A 111111)
+          for index in 1 2 3 4 5; do
+            number=$(printf '%02d' "$index")
+            colour=${colours[$((index - 1))]}
+            ffmpeg -hide_banner -loglevel error -y -f lavfi -i "color=c=0x${colour}:s=1080x1920" -frames:v 1 "assets/scene-${number}.jpg"
+            ffmpeg -hide_banner -loglevel error -y -f lavfi -i "sine=frequency=$((360 + index * 55)):duration=$((2 + index))" -c:a libmp3lame -b:a 128k "assets/scene-${number}.mp3"
+          done
+
+      - name: Render and validate
+        env:
+          MANIFEST_URL: ${{ inputs.manifest_url || 'example-manifest.json' }}
+          OUTPUT_NAME: ${{ inputs.output_name }}
+        run: |
+          mkdir -p output
+          python3 render_social.py "$MANIFEST_URL" "output/${OUTPUT_NAME}.mp4" --report "output/${OUTPUT_NAME}.report.json"
+
+      - name: Upload validated render
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.output_name }}
+          path: output/
+          if-no-files-found: error
+          retention-days: 3
