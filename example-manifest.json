@@ -1,0 +1,42 @@
+{
+  "brand": "RelationshipBuilt",
+  "voice_provider": "ElevenLabs",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "style": {
+    "accent": "D4AF37"
+  },
+  "scenes": [
+    {
+      "role": "hook",
+      "image": "assets/scene-01.jpg",
+      "voiceover": "assets/scene-01.mp3",
+      "overlay": "The pattern shows first"
+    },
+    {
+      "role": "body",
+      "image": "assets/scene-02.jpg",
+      "voiceover": "assets/scene-02.mp3",
+      "overlay": "Speak clearly before distance grows"
+    },
+    {
+      "role": "body",
+      "image": "assets/scene-03.jpg",
+      "voiceover": "assets/scene-03.mp3",
+      "overlay": "Listen without preparing a defence"
+    },
+    {
+      "role": "body",
+      "image": "assets/scene-04.jpg",
+      "voiceover": "assets/scene-04.mp3",
+      "overlay": "Repair quickly and honestly"
+    },
+    {
+      "role": "cta",
+      "image": "assets/scene-05.jpg",
+      "voiceover": "assets/scene-05.mp3",
+      "overlay": "Follow to build"
+    }
+  ]
+}
