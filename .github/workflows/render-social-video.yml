@@ -39,10 +39,15 @@ jobs:
       - name: Check out renderer
         uses: actions/checkout@v4
 
-      - name: Verify FFmpeg
+      - name: Install portable FFmpeg
         run: |
-          ffmpeg -version
-          ffprobe -version
+          npm install --no-save @ffmpeg-installer/ffmpeg @ffprobe-installer/ffprobe
+          mkdir -p "$HOME/.local/bin"
+          ln -sf "$GITHUB_WORKSPACE/node_modules/@ffmpeg-installer/linux-x64/ffmpeg" "$HOME/.local/bin/ffmpeg"
+          ln -sf "$GITHUB_WORKSPACE/node_modules/@ffprobe-installer/linux-x64/ffprobe" "$HOME/.local/bin/ffprobe"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/ffmpeg" -version
+          "$HOME/.local/bin/ffprobe" -version
           test -f /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
 
       - name: Prepare push smoke-test assets
