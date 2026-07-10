@@ -19,6 +19,10 @@ on:
         required: true
         default: social-video
         type: string
+      resumeUrl:
+        description: n8n resume webhook injected by the GitHub dispatch-and-wait node
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -49,6 +53,8 @@ jobs:
           done
 
       - name: Render and validate
+        id: render
+        continue-on-error: true
         env:
           MANIFEST_URL: ${{ inputs.manifest_url || 'example-manifest.json' }}
           OUTPUT_NAME: ${{ inputs.output_name || 'smoke-test' }}
@@ -57,9 +63,41 @@ jobs:
           python3 render_social.py "$MANIFEST_URL" "output/${OUTPUT_NAME}.mp4" --report "output/${OUTPUT_NAME}.report.json"
 
       - name: Upload validated render
+        id: upload
+        if: ${{ steps.render.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.output_name || 'smoke-test' }}
           path: output/
           if-no-files-found: error
           retention-days: 3
+
+      - name: Resume n8n workflow
+        if: ${{ always() && inputs.resumeUrl != '' }}
+        env:
+          RESUME_URL: ${{ inputs.resumeUrl }}
+          RENDER_OUTCOME: ${{ steps.render.outcome }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          OUTPUT_NAME: ${{ inputs.output_name || 'social-video' }}
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          status=failure
+          if [ "$RENDER_OUTCOME" = success ] && [ "$UPLOAD_OUTCOME" = success ]; then status=success; fi
+          jq -n \
+            --arg status "$status" \
+            --arg render_outcome "$RENDER_OUTCOME" \
+            --arg upload_outcome "$UPLOAD_OUTCOME" \
+            --arg artifact_id "$ARTIFACT_ID" \
+            --arg artifact_url "$ARTIFACT_URL" \
+            --arg output_name "$OUTPUT_NAME" \
+            --arg run_id "$RUN_ID" \
+            --arg repository "$REPOSITORY" \
+            '{status:$status,render_outcome:$render_outcome,upload_outcome:$upload_outcome,artifact_id:$artifact_id,artifact_url:$artifact_url,output_name:$output_name,run_id:$run_id,repository:$repository,voice_provider:"ElevenLabs",scene_count:5,image_count:5,voiceover_count:5}' \
+            | curl --fail-with-body --retry 3 --request POST --header 'Content-Type: application/json' --data-binary @- "$RESUME_URL"
+
+      - name: Fail unsuccessful render
+        if: ${{ steps.render.outcome != 'success' || steps.upload.outcome != 'success' }}
+        run: exit 1
