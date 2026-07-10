@@ -14,6 +14,10 @@ on:
         description: Public HTTPS URL for the five-scene manifest
         required: false
         type: string
+      manifest_json:
+        description: Inline five-scene manifest JSON supplied by n8n
+        required: false
+        type: string
       output_name:
         description: Output filename without extension
         required: true
@@ -41,7 +45,7 @@ jobs:
           sudo apt-get install --yes ffmpeg fonts-dejavu-core
 
       - name: Prepare push smoke-test assets
-        if: ${{ inputs.manifest_url == '' }}
+        if: ${{ inputs.manifest_url == '' && inputs.manifest_json == '' }}
         run: |
           mkdir -p assets
           colours=(243447 3A506B 2F4858 463F3A 111111)
@@ -52,11 +56,17 @@ jobs:
             ffmpeg -hide_banner -loglevel error -y -f lavfi -i "sine=frequency=$((360 + index * 55)):duration=$((2 + index))" -c:a libmp3lame -b:a 128k "assets/scene-${number}.mp3"
           done
 
+      - name: Prepare inline n8n manifest
+        if: ${{ inputs.manifest_json != '' }}
+        env:
+          MANIFEST_JSON: ${{ inputs.manifest_json }}
+        run: printf '%s' "$MANIFEST_JSON" > runtime-manifest.json
+
       - name: Render and validate
         id: render
         continue-on-error: true
         env:
-          MANIFEST_URL: ${{ inputs.manifest_url || 'example-manifest.json' }}
+          MANIFEST_URL: ${{ inputs.manifest_json != '' && 'runtime-manifest.json' || inputs.manifest_url || 'example-manifest.json' }}
           OUTPUT_NAME: ${{ inputs.output_name || 'smoke-test' }}
         run: |
           mkdir -p output
