@@ -39,10 +39,11 @@ jobs:
       - name: Check out renderer
         uses: actions/checkout@v4
 
-      - name: Install FFmpeg
+      - name: Verify FFmpeg
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes ffmpeg fonts-dejavu-core
+          ffmpeg -version
+          ffprobe -version
+          test -f /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
 
       - name: Prepare push smoke-test assets
         if: ${{ inputs.manifest_url == '' && inputs.manifest_json == '' }}
