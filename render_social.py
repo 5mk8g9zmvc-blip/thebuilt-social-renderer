@@ -128,7 +128,6 @@ def render_scene(
         "x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=black@0.46:boxborderw=30,"
         f"drawtext=fontfile='{font_path}':textfile='{brand_file}':expansion=none:"
         f"fontcolor={accent}:fontsize=34:x=(w-text_w)/2:y=h-165,"
-        "fade=t=in:st=0:d=0.22,"
         f"fade=t=out:st={fade_out:.3f}:d=0.28,format=yuv420p"
     )
     audio_filter = (
