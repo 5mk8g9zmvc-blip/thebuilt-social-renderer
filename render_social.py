@@ -122,7 +122,6 @@ def render_scene(
         f"zoompan=z='min(zoom+0.00045,1.075)':d=1:s={width}x{height}:fps={fps},"
         "eq=saturation=0.92:contrast=1.04,"
         "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.20:t=fill,"
-        f"drawbox=x=70:y=110:w=12:h=150:color={accent}@1.0:t=fill,"
         f"drawtext=fontfile='{font_path}':textfile='{overlay_file}':expansion=none:"
         f"fontcolor=white:fontsize={headline_size}:line_spacing=18:"
         "x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=black@0.46:boxborderw=30,"
