@@ -284,7 +284,7 @@ def main() -> int:
                 raise ValueError(f"Scene {index} voiceover is not a readable audio asset")
             voice_duration = duration_seconds(voice_info)
             requested = float(scene.get("duration", 0) or 0)
-            scene_duration = max(2.0, voice_duration + 0.40, requested)
+            scene_duration = max(0.75, voice_duration + 0.10, requested)
             if scene_duration > 12.0:
                 raise ValueError(f"Scene {index} exceeds the 12-second quality limit")
 
