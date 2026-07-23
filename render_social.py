@@ -100,6 +100,14 @@ def wrap_overlay(value: str) -> str:
     return "\n".join(lines)
 
 
+def bounded_float(value: Any, fallback: float, minimum: float, maximum: float) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = fallback
+    return max(minimum, min(maximum, number))
+
+
 def render_scene(
     scene_number: int,
     image_path: Path,
@@ -113,28 +121,78 @@ def render_scene(
     fps: int,
     font_path: str,
     accent: str,
+    role: str,
+    motion: str,
+    render_style: dict[str, Any],
 ) -> None:
-    fade_out = max(0.0, duration - 0.28)
-    headline_size = 68 if overlay_file.stat().st_size < 75 else 58
-    video_filter = (
-        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
-        f"crop={width}:{height},"
-        f"zoompan=z='min(zoom+0.00045,1.075)':d=1:s={width}x{height}:fps={fps},"
-        "eq=saturation=1.03:contrast=1.05:brightness=0.01,"
-        "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.08:t=fill,"
-        f"drawtext=fontfile='{font_path}':textfile='{overlay_file}':expansion=none:"
-        f"fontcolor=white:fontsize={headline_size}:line_spacing=18:"
-        "x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=black@0.46:boxborderw=30,"
-        f"drawtext=fontfile='{font_path}':textfile='{brand_file}':expansion=none:"
-        f"fontcolor={accent}:fontsize=34:x=(w-text_w)/2:y=h-165,"
-        f"fade=t=out:st={fade_out:.3f}:d=0.28,format=yuv420p"
+    role = str(role or "body").strip().lower()
+    motion_text = str(motion or "").strip().lower()
+    pace = str(render_style.get("pace", "cinematic")).strip().lower()
+    fast_profile = pace in {"fast", "rapid", "viral"} or any(
+        token in motion_text for token in ("rapid", "snap", "hard cut", "whip", "immediate")
     )
-    audio_filter = (
-        "loudnorm=I=-16:LRA=11:TP=-1.5,"
-        f"apad,atrim=0:{duration:.3f},"
-        "afade=t=in:st=0:d=0.08,"
-        f"afade=t=out:st={max(0.0, duration - 0.18):.3f}:d=0.18"
-    )
+    no_fade = bool(render_style.get("no_fade", False))
+
+    if role == "hook" and fast_profile:
+        zoom_target = bounded_float(render_style.get("hook_zoom_rate"), 1.20, 1.10, 1.24)
+        ramp_frames = max(6, min(15, round(fps * 0.35)))
+        ramp_step = (zoom_target - 1.0) / ramp_frames
+        zoom_expression = (
+            f"if(lte(on,{ramp_frames}),"
+            f"min(1+{ramp_step:.7f}*on,{zoom_target:.5f}),"
+            f"min(zoom+0.00055,{zoom_target:.5f}))"
+        )
+        headline_size = 78 if overlay_file.stat().st_size < 90 else 66
+        brightness = 0.035
+        overlay_y = "(h-text_h)*0.43"
+    elif fast_profile:
+        zoom_target = bounded_float(render_style.get("body_zoom_rate"), 1.085, 1.04, 1.12)
+        zoom_expression = f"min(zoom+0.00115,{zoom_target:.5f})"
+        headline_size = 66 if overlay_file.stat().st_size < 75 else 58
+        brightness = 0.018
+        overlay_y = "(h-text_h)*0.46"
+    else:
+        zoom_expression = "min(zoom+0.00045,1.075)"
+        headline_size = 68 if overlay_file.stat().st_size < 75 else 58
+        brightness = 0.01
+        overlay_y = "(h-text_h)/2"
+
+    video_filters = [
+        f"scale={width}:{height}:force_original_aspect_ratio=increase",
+        f"crop={width}:{height}",
+        (
+            f"zoompan=z='{zoom_expression}':"
+            f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+            f"d=1:s={width}x{height}:fps={fps}"
+        ),
+        f"eq=saturation=1.03:contrast=1.07:brightness={brightness:.3f}",
+        "unsharp=5:5:0.45:5:5:0.0",
+        "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.06:t=fill",
+        (
+            f"drawtext=fontfile='{font_path}':textfile='{overlay_file}':expansion=none:"
+            f"fontcolor=white:fontsize={headline_size}:line_spacing=18:"
+            f"x=(w-text_w)/2:y={overlay_y}:box=1:boxcolor=black@0.50:boxborderw=30"
+        ),
+        (
+            f"drawtext=fontfile='{font_path}':textfile='{brand_file}':expansion=none:"
+            f"fontcolor={accent}:fontsize=34:x=(w-text_w)/2:y=h-165"
+        ),
+    ]
+    if not no_fade:
+        fade_out = max(0.0, duration - 0.28)
+        video_filters.append(f"fade=t=out:st={fade_out:.3f}:d=0.28")
+    video_filters.append("format=yuv420p")
+    video_filter = ",".join(video_filters)
+
+    audio_filters = [
+        "loudnorm=I=-16:LRA=11:TP=-1.5",
+        f"apad,atrim=0:{duration:.3f}",
+    ]
+    if not (role == "hook" and fast_profile):
+        audio_filters.append("afade=t=in:st=0:d=0.04")
+    audio_filters.append(f"afade=t=out:st={max(0.0, duration - 0.06):.3f}:d=0.06")
+    audio_filter = ",".join(audio_filters)
+
     run(
         [
             "ffmpeg",
@@ -179,7 +237,6 @@ def render_scene(
     scene_info = probe(output_path)
     if not has_stream(scene_info, "video") or not has_stream(scene_info, "audio"):
         raise RuntimeError(f"Scene {scene_number} failed audio/video validation")
-
 
 def mix_music(input_path: Path, music_path: Path, output_path: Path, volume: float) -> None:
     run(
@@ -254,6 +311,8 @@ def main() -> int:
         raise ValueError("Production output is locked to 30 fps")
 
     style = manifest.get("style") or {}
+    pace = str(style.get("pace", "cinematic")).strip().lower()
+    render_profile = "fast" if pace in {"fast", "rapid", "viral"} else "cinematic"
     font_path = str(style.get("font_path") or DEFAULT_FONT)
     if not Path(font_path).is_file():
         raise ValueError(f"Font does not exist: {font_path}")
@@ -304,6 +363,9 @@ def main() -> int:
                 fps,
                 font_path,
                 accent,
+                str(scene.get("role", "body")),
+                str(scene.get("motion", "")),
+                style,
             )
             rendered.append(scene_output)
             scene_report.append(
@@ -314,6 +376,8 @@ def main() -> int:
                     "rendered_duration": round(duration_seconds(probe(scene_output)), 3),
                     "image_bytes": image_path.stat().st_size,
                     "voiceover_bytes": voice_path.stat().st_size,
+                    "motion": str(scene.get("motion", "")),
+                    "render_profile": render_profile,
                 }
             )
 
@@ -376,6 +440,8 @@ def main() -> int:
         "voice_provider": "ElevenLabs",
         "source_voiceover_format": "ElevenLabs output (MP3 accepted)",
         "delivery_audio_codec": "AAC inside the social MP4 container",
+        "render_profile": render_profile,
+        "hard_cuts": bool(style.get("no_fade", False)),
         "cta_scene": 5,
         "width": video_streams[0].get("width") if video_streams else None,
         "height": video_streams[0].get("height") if video_streams else None,
